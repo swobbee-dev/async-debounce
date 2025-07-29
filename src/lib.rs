@@ -1,6 +1,6 @@
 #![no_std]
 
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, with_timeout};
 use embedded_hal::digital::{ErrorType, InputPin};
 use embedded_hal_async::digital::Wait;
 
@@ -41,11 +41,10 @@ impl<T: Wait + InputPin> Wait for Debouncer<T> {
         if self.input.is_low()? {
             loop {
                 self.input.wait_for_rising_edge().await?;
-
-                Timer::after(self.debounce_high_time).await;
-
-                if self.input.is_high()? {
-                    break;
+                if with_timeout(self.debounce_high_time, self.input.wait_for_low()).await.is_err() {
+                    if self.input.is_high()? {
+                        break;
+                    }
                 }
             }
         }
@@ -56,11 +55,10 @@ impl<T: Wait + InputPin> Wait for Debouncer<T> {
         if self.input.is_high()? {
             loop {
                 self.input.wait_for_falling_edge().await?;
-
-                Timer::after(self.debounce_low_time).await;
-
-                if self.input.is_low()? {
-                    break;
+                if with_timeout(self.debounce_low_time, self.input.wait_for_high()).await.is_err() {
+                    if self.input.is_low()? {
+                        break;
+                    }
                 }
             }
         }
@@ -70,11 +68,10 @@ impl<T: Wait + InputPin> Wait for Debouncer<T> {
     async fn wait_for_rising_edge(&mut self) -> Result<(), T::Error> {
         loop {
             self.input.wait_for_rising_edge().await?;
-
-            Timer::after(self.debounce_high_time).await;
-
-            if self.input.is_high()? {
-                break Ok(());
+            if with_timeout(self.debounce_high_time, self.input.wait_for_low()).await.is_err() {
+                if self.input.is_high()? {
+                    break Ok(());
+                }
             }
         }
     }
@@ -82,11 +79,10 @@ impl<T: Wait + InputPin> Wait for Debouncer<T> {
     async fn wait_for_falling_edge(&mut self) -> Result<(), T::Error> {
         loop {
             self.input.wait_for_falling_edge().await?;
-
-            Timer::after(self.debounce_low_time).await;
-
-            if self.input.is_low()? {
-                break Ok(());
+            if with_timeout(self.debounce_low_time, self.input.wait_for_high()).await.is_err() {
+                if self.input.is_low()? {
+                    break Ok(());
+                }
             }
         }
     }
